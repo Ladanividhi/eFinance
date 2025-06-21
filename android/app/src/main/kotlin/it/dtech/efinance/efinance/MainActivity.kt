@@ -1,4 +1,4 @@
-package it.dtech.efinance.efinance
+package it.dtech.efinance
 
 import io.flutter.embedding.android.FlutterActivity
 

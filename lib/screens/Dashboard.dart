@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:eFinance/screens/AddTransaction.dart';
 import 'package:eFinance/screens/Login.dart';
+import 'package:eFinance/screens/Reports.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/Constants.dart';
@@ -37,114 +41,190 @@ class _DashboardPageState extends State<DashboardPage> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
-          (route) => false,
+      (route) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        backgroundColor: primary_color,
-        elevation: 0,
-        title: Text('Hello, $username!'),
-        centerTitle: true,
-      ),
-      drawer: Drawer(
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            topRight: Radius.circular(40),
-            bottomRight: Radius.circular(40),
+        backgroundColor: bg_color,
+        appBar: AppBar(
+          iconTheme: const IconThemeData(color: Colors.white),
+          backgroundColor: primary_color,
+          elevation: 0,
+          title: Text(
+            'Hello, $username!',
+            style: TextStyle(color: Colors.white),
           ),
+          centerTitle: true,
         ),
-        backgroundColor: Colors.grey[100],
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: primary_color,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundImage: AssetImage("assets/images/logo.png"),
-                    backgroundColor: Colors.white,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    username ?? 'User',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                  Text(
-                    userEmail ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
-              ),
+        drawer: Drawer(
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(40),
+              bottomRight: Radius.circular(40),
             ),
-
-            ListTile(
-              leading: const Icon(Icons.search),
-              title: const Text('Search'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.note_add_outlined),
-              title: const Text('Add Transaction'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.bar_chart),
-              title: const Text('Reports'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Share Database'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_money),
-              title: const Text('Payment'),
-              onTap: () {},
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Sign Out'),
-              onTap: _logout,
-            ),
-          ],
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          ),
+          backgroundColor: Colors.grey[100],
+          child: ListView(
+            padding: EdgeInsets.zero,
             children: [
-              Image.asset("assets/images/logo.png", height: 100),
-              const SizedBox(height: 20),
-              Text(
-                "Welcome back, $username!",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: primary_color,
+              DrawerHeader(
+                decoration: const BoxDecoration(color: primary_color),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircleAvatar(
+                      radius: 30,
+                      backgroundImage: AssetImage("assets/images/logo.png"),
+                      backgroundColor: Colors.white,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      username ?? 'User',
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                    ),
+                    Text(
+                      userEmail ?? '',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              const Text(
-                "Your financial dashboard is ready",
-                style: TextStyle(fontSize: 16, color: Colors.black87),
+
+              ListTile(
+                leading: Icon(Icons.saved_search, color: primary_color),
+                title: const Text(
+                  'Search',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {},
+              ),
+
+              ListTile(
+                leading: const Icon(
+                  Icons.add_card,
+                  color: primary_color,
+                ),
+                title: const Text(
+                  'Add Transaction',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddTransactionPage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.receipt, color: primary_color),
+                title: const Text(
+                  'Reports',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ReportsPage()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.mobile_screen_share_outlined, color: primary_color,),
+                title: const Text(
+                  'Share Database',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {},
+              ),
+              ListTile(
+                leading: const Icon(Icons.monetization_on_rounded, color: primary_color),
+                title: const Text(
+                  'Payment',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {},
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings, color: primary_color),
+                title: const Text(
+                  'Settings',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                onTap: () {},
+              ),
+              ListTile(
+                leading: const Icon(Icons.logout_sharp, color: Colors.redAccent),
+                title: const Text(
+                  'Sign Out',
+                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.redAccent),
+                ),
+                onTap: () async {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text("Confirm Sign Out"),
+                        content: const Text("Are you sure you want to Sign Out?"),
+                        actions: [
+                          TextButton(
+                            child: const Text("Cancel"),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                          TextButton(
+                            child: const Text("Yes"),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              _logout();
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginPage(),
+                                ),
+                                    (Route<dynamic> route) => false,
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
         ),
-      ),
-    );
+        body: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset("assets/images/logo.png", height: 100),
+                const SizedBox(height: 20),
+                Text(
+                  "Welcome back, $username!",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: primary_color,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Your financial dashboard is ready",
+                  style: TextStyle(fontSize: 16, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
   }
 }

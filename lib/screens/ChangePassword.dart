@@ -134,7 +134,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bg_color,
       body: SingleChildScrollView(
         child: Column(
           children: [

@@ -8,7 +8,7 @@
 PRODUCT_NAME = efinance
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = it.dtech.efinance.efinance
+PRODUCT_BUNDLE_IDENTIFIER = it.dtech.efinance
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 it.dtech.efinance. All rights reserved.

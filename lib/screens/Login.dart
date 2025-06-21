@@ -75,12 +75,13 @@ class _LoginPageState extends State<LoginPage> {
       // Login successful
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('remember_me', _rememberMe);
+      await prefs.setString('user_name', username);
+      await prefs.setString('user_email', user['email']);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login successful!")),
       );
 
-      // Navigate to home page or dashboard if needed
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DashboardPage()));
     } else {
       // Invalid credentials
@@ -94,7 +95,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bg_color,
       body: SingleChildScrollView(
         child: Column(
           children: [
