@@ -29,7 +29,6 @@ class _ReportsPageState extends State<ReportsPage> {
     setState(() => _isLoading = false);
   }
 
-
   Future<void> _loadTransactions() async {
     final db = await DatabaseHelper.instance.database;
     final List<Map<String, dynamic>> result = await db.query(
@@ -76,42 +75,76 @@ class _ReportsPageState extends State<ReportsPage> {
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
         iconColor: primary_color,
         collapsedIconColor: primary_color,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                data['full_name'] ?? '',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: primary_color,
-                ),
+          children: [
+            Text(
+              data['full_name'] ?? '',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primary_color,
               ),
-              const SizedBox(height: 6),
-              _buildInfoRow(Icons.account_box, "Account No", "${data['account_number']}"),
-              _buildInfoRow(Icons.currency_rupee, "Loan Amount", "₹${data['loan_amount']}"),
-              _buildInfoRow(Icons.account_balance_wallet, "Balance", "₹${data['balance']}"),
-              _buildInfoRow(Icons.calendar_today, "Date", formatDate(data['date'])),
-            ]
+            ),
+            const SizedBox(height: 6),
+            _buildInfoRow(
+              Icons.account_box,
+              "Account No",
+              "${data['account_number']}",
+            ),
+            _buildInfoRow(
+              Icons.currency_rupee,
+              "Loan Amount",
+              "₹${data['loan_amount']}",
+            ),
+            _buildInfoRow(
+              Icons.account_balance_wallet,
+              "Balance",
+              "₹${data['balance']}",
+            ),
+            _buildInfoRow(
+              Icons.calendar_today,
+              "Date",
+              formatDate(data['date']),
+            ),
+          ],
         ),
-        childrenPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        childrenPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 12,
+        ),
         children: [
           const Divider(thickness: 1.2),
           _buildDetailRow(Icons.phone, "Contact No", data['contact_number']),
           _buildDetailRow(Icons.home, "Address", data['address']),
           _buildDetailRow(Icons.percent, "Interest", "₹${data['interest']}"),
-          _buildDetailRow(Icons.repeat, "C/F Balance", "₹${data['cf_balance']}"),
-          _buildDetailRow(Icons.arrow_circle_up, "Withdrawal", "₹${data['withdrawal_amount']}"),
-          _buildDetailRow(Icons.arrow_circle_down, "Credit", "₹${data['credit_amount']}"),
+          _buildDetailRow(
+            Icons.repeat,
+            "C/F Balance",
+            "₹${data['cf_balance']}",
+          ),
+          _buildDetailRow(
+            Icons.arrow_circle_up,
+            "Withdrawal",
+            "₹${data['withdrawal_amount']}",
+          ),
+          _buildDetailRow(
+            Icons.arrow_circle_down,
+            "Credit",
+            "₹${data['credit_amount']}",
+          ),
           _buildDetailRow(Icons.group, "Guarantor", data['guarantor_name']),
           const SizedBox(height: 5),
         ],
       ),
     );
   }
+
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
@@ -124,7 +157,11 @@ class _ReportsPageState extends State<ReportsPage> {
             flex: 4,
             child: Text(
               "$label:",
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.black87,
+              ),
             ),
           ),
           Expanded(
@@ -139,6 +176,7 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
     );
   }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -166,7 +204,144 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
+  PopupMenuItem<String> _buildPopupItem(
+    String text,
+    IconData icon,
+    String value,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: primary_color, size: 20),
+          const SizedBox(width: 10),
+          Text(
+            text,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Future<void> _filterToday() async {
+    final db = await DatabaseHelper.instance.database;
+
+    // Format today's date as 'dd-MM-yyyy' to match DB format
+    final today = DateFormat('d-M-yyyy').format(DateTime.now());
+
+    final List<Map<String, dynamic>> result = await db.query(
+      'transactions',
+      where: "date = ?",
+      whereArgs: [today],
+      orderBy: 'date DESC',
+    );
+
+    setState(() {
+      _filteredTransactions = result;
+    });
+
+    print("Filtered ${result.length} transactions for today ($today)");
+  }
+
+
+
+  Future<void> _filterYesterday() async {
+    final db = await DatabaseHelper.instance.database;
+
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final formatted = DateFormat('d-M-yyyy').format(yesterday); // Match DB format
+
+    final List<Map<String, dynamic>> result = await db.query(
+      'transactions',
+      where: "date = ?",
+      whereArgs: [formatted],
+      orderBy: 'date DESC',
+    );
+
+    setState(() {
+      _filteredTransactions = result;
+    });
+
+  }
+
+
+  void _filterThisMonth() {
+    final now = DateTime.now();
+    setState(() {
+      _filteredTransactions = _transactions.where((tx) {
+        final dateStr = tx['date'];
+        DateTime? date;
+
+        try {
+          date = DateFormat('dd-MM-yyyy').parse(dateStr);
+        } catch (e) {
+          // If parsing fails, treat as invalid
+          return false;
+        }
+
+        return date.year == now.year && date.month == now.month;
+      }).toList();
+    });
+  }
+
+
+  void _filterThisYear() {
+    final now = DateTime.now();
+    setState(() {
+      _filteredTransactions = _transactions.where((tx) {
+        final dateStr = tx['date'];
+        DateTime? date;
+
+        try {
+          date = DateFormat('dd-MM-yyyy').parse(dateStr);
+        } catch (e) {
+          return false;
+        }
+
+        return date.year == now.year;
+      }).toList();
+    });
+  }
+
+
+  Future<void> _selectDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: primary_color),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final formatted = DateFormat('dd-MM-yyyy').format(picked);
+      setState(() {
+        _filteredTransactions = _transactions.where((tx) {
+          final dateStr = tx['date'];
+          DateTime? date;
+
+          try {
+            date = DateFormat('dd-MM-yyyy').parse(dateStr);
+          } catch (e) {
+            return false;
+          }
+          return date.year == picked.year && date.month == picked.month && date.day == picked.day;
+        }).toList();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a date to filter.")),
+      );
+    }
+  }
 
 
   @override
@@ -180,7 +355,60 @@ class _ReportsPageState extends State<ReportsPage> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            onSelected: (value) {
+              switch (value) {
+                case 'today':
+                  _filterToday();
+                  break;
+                case 'yesterday':
+                  _filterYesterday();
+                  break;
+                case 'select_date':
+                  _selectDate();
+                  break;
+                case 'this_month':
+                  _filterThisMonth();
+                  break;
+                case 'this_year':
+                  _filterThisYear();
+                  break;
+                case 'till_now':
+                  _loadTransactions();
+                  break;
+              }
+            },
+            itemBuilder:
+                (BuildContext context) => [
+                  _buildPopupItem("Today", Icons.today, 'today'),
+                  _buildPopupItem(
+                    "Yesterday",
+                    Icons.calendar_view_day,
+                    'yesterday',
+                  ),
+                  _buildPopupItem(
+                    "Select Date",
+                    Icons.date_range,
+                    'select_date',
+                  ),
+                  _buildPopupItem(
+                    "This Month",
+                    Icons.calendar_month,
+                    'this_month',
+                  ),
+                  _buildPopupItem("This Year", Icons.event, 'this_year'),
+                  _buildPopupItem("Till Now", Icons.history, 'till_now'),
+                ],
+          ),
+        ],
       ),
+
       body: Column(
         children: [
           // 🔄 Circular loading indicator (visible only when loading)
@@ -188,9 +416,7 @@ class _ReportsPageState extends State<ReportsPage> {
             Padding(
               padding: const EdgeInsets.all(20),
               child: Center(
-                child: CircularProgressIndicator(
-                  color: primary_color,
-                ),
+                child: CircularProgressIndicator(color: primary_color),
               ),
             ),
 
@@ -210,51 +436,57 @@ class _ReportsPageState extends State<ReportsPage> {
                   hintText: 'Search by Name or Account No.',
                   prefixIcon: Icon(Icons.search, color: primary_color),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
 
           // 📋 Transaction List
           Expanded(
-            child: _isLoading
-                ? const SizedBox() // Already showing progress above
-                : _filteredTransactions.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.receipt_long_outlined,
-                    size: 70,
-                    color: primary_color.withOpacity(0.4),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    "No Transactions Found",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade700,
+            child:
+                _isLoading
+                    ? const SizedBox() // Already showing progress above
+                    : _filteredTransactions.isEmpty
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 70,
+                            color: primary_color.withOpacity(0.4),
+                          ),
+                          const SizedBox(height: 15),
+                          Text(
+                            "No Transactions Found",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Try adding a new transaction.",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : ListView.builder(
+                      itemCount: _filteredTransactions.length,
+                      itemBuilder: (context, index) {
+                        return buildTransactionCard(
+                          _filteredTransactions[index],
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    "Try adding a new transaction.",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            )
-                : ListView.builder(
-              itemCount: _filteredTransactions.length,
-              itemBuilder: (context, index) {
-                return buildTransactionCard(_filteredTransactions[index]);
-              },
-            ),
           ),
 
           // 🖨️ Print Button
@@ -275,12 +507,14 @@ class _ReportsPageState extends State<ReportsPage> {
                   );
                 },
                 icon: const Icon(Icons.print, color: Colors.white),
-                label: const Text("Print", style: TextStyle(color: Colors.white)),
+                label: const Text(
+                  "Print",
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ),
         ],
       ),
     );
   }
-
 }

@@ -104,6 +104,7 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete('users', where: 'email = ?', whereArgs: [email]);
   }
+
   Future<bool> isAccountNumberUsed(String accNo) async {
     final db = await database;
     final result = await db.query(

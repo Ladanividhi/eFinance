@@ -32,8 +32,13 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
   @override
   void dispose() {
     _accountFocusNode.dispose();
+    _interestController.removeListener(_updateBalance);
+    _cfBalanceController.removeListener(_updateBalance);
+    _withdrawalAmountController.removeListener(_updateBalance);
+    _creditAmountController.removeListener(_updateBalance);
     super.dispose();
   }
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +68,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               ),
             );
           }
-
+          _interestController.addListener(_updateBalance);
+          _cfBalanceController.addListener(_updateBalance);
+          _withdrawalAmountController.addListener(_updateBalance);
+          _creditAmountController.addListener(_updateBalance);
         }
       }
     });
@@ -225,6 +233,16 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       );
     }
   }
+  void _updateBalance() {
+    final interest = double.tryParse(_interestController.text.trim()) ?? 0;
+    final cfBalance = double.tryParse(_cfBalanceController.text.trim()) ?? 0;
+    final withdrawal = double.tryParse(_withdrawalAmountController.text.trim()) ?? 0;
+    final credit = double.tryParse(_creditAmountController.text.trim()) ?? 0;
+
+    final calculatedBalance = interest + cfBalance + withdrawal - credit;
+    _balanceController.text = calculatedBalance.toStringAsFixed(2); // update the balance
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +284,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               const SizedBox(height: 15),
               TextFormField(controller: _creditAmountController, decoration: _inputDecoration("Enter Credit Amount", Icons.arrow_circle_down), keyboardType: TextInputType.number),
               const SizedBox(height: 15),
-              TextFormField(controller: _balanceController, decoration: _inputDecoration("Enter Balance", Icons.account_balance_wallet), keyboardType: TextInputType.number),
+              TextFormField(controller: _balanceController, decoration: _inputDecoration("Enter Balance", Icons.account_balance_wallet), keyboardType: TextInputType.number, readOnly: true),
               const SizedBox(height: 15),
               TextFormField(controller: _guarantorNameController, decoration: _inputDecoration("Enter Guarantor Name", Icons.supervisor_account)),
               const SizedBox(height: 15),
