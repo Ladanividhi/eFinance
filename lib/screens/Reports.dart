@@ -1,7 +1,12 @@
+import 'dart:ui' show TextStyle;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:eFinance/utils/Constants.dart';
 import 'package:eFinance/db/database_helper.dart';
-import 'package:intl/intl.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -342,6 +347,83 @@ class _ReportsPageState extends State<ReportsPage> {
       );
     }
   }
+  Future<void> _generatePdfReport() async {
+    final pdf = pw.Document();
+
+    final now = DateTime.now();
+    final formattedDate = "${now.day}-${now.month}-${now.year}";
+
+    pdf.addPage(
+      pw.MultiPage(
+        build: (pw.Context context) => [
+          pw.Center(
+            child: pw.Text(
+              'Loan Report',
+              style: pw.TextStyle(
+                fontSize: 20,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text('Date: $formattedDate', style: pw.TextStyle(fontSize: 12)),
+          pw.SizedBox(height: 20),
+          pw.Table.fromTextArray(
+            headers: [
+              'Acc',
+              'Date',
+              'Full Name',
+              'Loan Amount',
+              'Interest',
+              'Withdrawal',
+              'Credit',
+              'Balance',
+            ],
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration:
+            pw.BoxDecoration(color: PdfColors.blueGrey800),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellStyle: const pw.TextStyle(fontSize: 10),
+            cellHeight: 30,
+            cellAlignments: {
+              3: pw.Alignment.centerRight,
+              4: pw.Alignment.centerRight,
+              5: pw.Alignment.centerRight,
+              6: pw.Alignment.centerRight,
+              7: pw.Alignment.centerRight,
+            },
+            data: _filteredTransactions.map((tx) {
+              return [
+                tx['account_number'] ?? '',
+                tx['date'] ?? '',
+                tx['full_name'] ?? '',
+                tx['loan_amount'].toString(),
+                tx['interest'].toString(),
+                tx['withdrawal_amount'].toString(),
+                tx['credit_amount'].toString(),
+                tx['balance'].toString(),
+              ];
+            }).toList(),
+          ),
+          pw.SizedBox(height: 15),
+          pw.Text(
+            'Total Records: ${_filteredTransactions.length}',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+
+    // Show print dialog
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'LoanReport',
+    );
+  }
+
 
 
   @override
@@ -502,9 +584,15 @@ class _ReportsPageState extends State<ReportsPage> {
                   ),
                 ),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Print feature coming soon")),
-                  );
+                  {
+                    if (_filteredTransactions.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("No data available to print.")),
+                      );
+                    } else {
+                      _generatePdfReport();
+                    }
+                  }
                 },
                 icon: const Icon(Icons.print, color: Colors.white),
                 label: const Text(

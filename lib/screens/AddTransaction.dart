@@ -94,11 +94,9 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       },
     );
 
-    if (picked != null) {
-      setState(() {
-        _dateController.text = "${picked.day}-${picked.month}-${picked.year}";
-      });
-    }
+    setState(() {
+      _dateController.text = "${picked!.day}-${picked.month}-${picked.year}";
+    });
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
@@ -145,21 +143,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
       final creditAmountVal = double.tryParse(creditAmount) ?? 0;
       final balanceVal = double.tryParse(balance) ?? 0;
 
-
-      final nameRegex = RegExp(r"^[a-zA-Z\s]+$");
-      if (!nameRegex.hasMatch(fullName.trim())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Name should have only alphabets and spaces")),
-        );
-        return;
-      }
-
-      if(accountNumber.length < 9 || accountNumber.length > 18) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Enter valid account number")),
-        );
-        return;
-      }
       if(contact.length != 10) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Enter valid 10 digit contact number")),
@@ -178,12 +161,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
         return;
       }
 
-      if (!nameRegex.hasMatch(guarantorName.trim())) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Guarantor name should have only alphabets and spaces")),
-        );
-        return;
-      }
       final prefs = await SharedPreferences.getInstance();
 
       final transaction = {
@@ -198,7 +175,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
         'withdrawal_amount': withdrawalAmountVal,
         'credit_amount': creditAmountVal,
         'balance': balanceVal,
-        'guarantor_name': _guarantorNameController.text.trim(),
+        'guarantor_name': guarantorName,
         'date': _dateController.text.trim(),
       };
 
