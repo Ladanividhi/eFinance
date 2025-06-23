@@ -161,10 +161,8 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
         return;
       }
 
-      final prefs = await SharedPreferences.getInstance();
-
       final transaction = {
-        'email' : prefs.getString('user_email') ?? '',
+        'status' : true,
         'account_number': accountNumber,
         'full_name': fullName,
         'contact_number': contact,

@@ -33,7 +33,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT,
+        status BOOLEAN,
         account_number INTEGER,
         full_name TEXT,
         contact_number TEXT,

@@ -3,6 +3,7 @@ import 'package:eFinance/screens/AddTransaction.dart';
 import 'package:eFinance/screens/Login.dart';
 import 'package:eFinance/screens/Reports.dart';
 import 'package:eFinance/screens/SearchScreen.dart';
+import 'package:eFinance/screens/Settings.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/Constants.dart';
@@ -161,8 +162,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 'Settings',
                 style: TextStyle(fontWeight: FontWeight.w500),
               ),
-              onTap: () {},
-            ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
+              },            ),
             ListTile(
               leading: const Icon(Icons.logout_sharp, color: Colors.redAccent),
               title: const Text(
