@@ -39,14 +39,14 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   Future<void> _loadTransactions() async {
     print('Loading transactions...');
     try {
-      final db = await DatabaseHelper.instance.database;
+    final db = await DatabaseHelper.instance.database;
       print('Database opened.');
-      final List<Map<String, dynamic>> result = await db.query(
-        'transactions',
-        where: 'status = ?',
+    final List<Map<String, dynamic>> result = await db.query(
+      'transactions',
+      where: 'status = ?',
         whereArgs: [_showRunning ? 1 : 0],
-        orderBy: 'date DESC',
-      );
+      orderBy: 'date DESC',
+    );
       print('Query complete. Rows: \\${result.length}');
 
       String query = _searchController.text;
@@ -139,48 +139,124 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
       color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data['full_name'] ?? '',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: primary_color,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildInfoRow(Icons.account_box, "Account No", "${data['account_number']}"),
-                  _buildInfoRow(Icons.account_balance_wallet, "Balance", "₹${data['balance']}"),
-                  _buildInfoRow(Icons.calendar_today, "Date", formatDate(data['date'])),
-                ],
-              ),
-            ),
-            // Action icons
-            Column(
+            // Top row with edit & delete buttons
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: primary_color, size: 24),
-                  onPressed: () {
-                    _showEditDialog(data);
-                  },
+                // Left content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['full_name'] ?? '',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: primary_color,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(Icons.account_box, "Account No", "${data['account_number']}"),
+                      _buildInfoRow(Icons.account_balance_wallet, "Balance", "₹${data['balance']}"),
+                      _buildInfoRow(Icons.calendar_today, "Date", formatDate(data['date'])),
+                    ],
+                  ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red.shade700, size: 24),
-                  onPressed: () {
-                    _deleteTransaction(data['id']);
-                  },
+                // Right action icons
+                Column(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit, color: primary_color, size: 24),
+                      onPressed: () {
+                        _showEditDialog(data);
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red.shade700, size: 24),
+                      onPressed: () {
+                        _deleteTransaction(data['id']);
+                      },
+                    ),
+                  ],
                 ),
               ],
-            )
+            ),
+            const SizedBox(height: 10),
+            // Center button
+            Align(
+              alignment: Alignment.center,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primary_color,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                icon: const Icon(Icons.change_circle, color: Colors.white),
+                label: const Text(
+                  "Change Status",
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+                onPressed: () {
+                  // You can handle status update logic here
+                  _showStatusChangeDialog(data);
+                },
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  void _showStatusChangeDialog(Map<String, dynamic> data) {
+    String currentStatus = data['status'] == 1 ? "Running" : "Closed";
+    String newStatus = data['status'] == 1 ? "Closed" : "Running";
+    int newStatusValue = data['status'] == 1 ? 0 : 1;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            "Change Status",
+            style: TextStyle(fontWeight: FontWeight.bold, color: primary_color),
+          ),
+          content: Text(
+            "Are you sure you want to change the status from $currentStatus to $newStatus?",
+          ),
+          actions: [
+            TextButton(
+              child: const Text("Cancel", style: TextStyle(color: primary_color)),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primary_color),
+              child: const Text("Yes", style: TextStyle(color: Colors.white)),
+              onPressed: () async {
+                final db = await DatabaseHelper.instance.database;
+                await db.update(
+                  'transactions',
+                  {'status': newStatusValue},
+                  where: 'id = ?',
+                  whereArgs: [data['id']],
+                );
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Status changed to $newStatus"),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _fetchData(); // refresh list
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -216,7 +292,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
       builder: (BuildContext context) {
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            title: const Text("Edit Transaction"),
+            title: const Text("Edit Transaction", style: TextStyle(color: primary_color, fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -497,7 +573,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
 
           try {
             date = DateFormat('dd-MM-yyyy').parse(dateStr);
-          } catch (e) {
+    } catch (e) {
             return false;
           }
           return date.year == picked.year && date.month == picked.month && date.day == picked.day;
@@ -585,7 +661,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               ),
             if (!_isLoading) ...[
               // Search Bar
-              Container(
+            Container(
                 margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -595,7 +671,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: _filterSearchResults,
-                  decoration: InputDecoration(
+                    decoration: InputDecoration(
                     hintText: 'Search by Name or Account No.',
                     prefixIcon: Icon(Icons.search, color: primary_color),
                     border: InputBorder.none,
@@ -610,44 +686,44 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Radio<bool>(
-                      value: true,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Radio<bool>(
+                        value: true,
                       groupValue: _showRunning,
-                      onChanged: (value) {
+                        onChanged: (value) {
                         if (value != null && value != _showRunning) {
                           setState(() => _showRunning = value);
                           _fetchData();
                         }
-                      },
-                      activeColor: primary_color,
-                    ),
+                        },
+                        activeColor: primary_color,
+                      ),
                     const Text('Running'),
-                    const SizedBox(width: 20),
-                    Radio<bool>(
-                      value: false,
+                      const SizedBox(width: 20),
+                      Radio<bool>(
+                        value: false,
                       groupValue: _showRunning,
-                      onChanged: (value) {
+                        onChanged: (value) {
                         if (value != null && value != _showRunning) {
                           setState(() => _showRunning = value);
                           _fetchData();
                         }
-                      },
-                      activeColor: primary_color,
-                    ),
+                        },
+                        activeColor: primary_color,
+                      ),
                     const Text('Closed'),
-                  ],
-                ),
+                    ],
+                  ),
               ),
               // Transaction List
-              Expanded(
+            Expanded(
                 child: _filteredTransactions.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
                               Icons.receipt_long_outlined,
                               size: 70,
                               color: primary_color.withOpacity(0.4),
@@ -655,33 +731,33 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                             const SizedBox(height: 15),
                             Text(
                               "No Transactions Found",
-                              style: TextStyle(
+                      style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.grey.shade700,
                               ),
                             ),
                             const SizedBox(height: 5),
-                            Text(
+                    Text(
                               "No records match the current filter.",
-                              style: TextStyle(
+                      style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : ListView.builder(
                         itemCount: _filteredTransactions.length,
                         padding: const EdgeInsets.only(bottom: 20),
-                        itemBuilder: (context, index) {
+                itemBuilder: (context, index) {
                           return buildTransactionCard(
                             _filteredTransactions[index],
-                          );
-                        },
-                      ),
+                  );
+                },
               ),
+            ),
             ],
           ],
         ),

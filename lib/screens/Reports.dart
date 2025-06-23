@@ -20,6 +20,8 @@ class _ReportsPageState extends State<ReportsPage> {
   List<Map<String, dynamic>> _filteredTransactions = [];
   TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
+  bool _showRunning = true; // true for running, false for closed
+  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth'
 
   @override
   void initState() {
@@ -29,7 +31,6 @@ class _ReportsPageState extends State<ReportsPage> {
 
   void _fetchData() async {
     setState(() => _isLoading = true);
-    // Fetch transactions
     await _loadTransactions();
     setState(() => _isLoading = false);
   }
@@ -38,6 +39,8 @@ class _ReportsPageState extends State<ReportsPage> {
     final db = await DatabaseHelper.instance.database;
     final List<Map<String, dynamic>> result = await db.query(
       'transactions',
+      where: 'status = ?',
+      whereArgs: [_showRunning ? 1 : 0],
       orderBy: 'date DESC',
     );
 
@@ -231,87 +234,61 @@ class _ReportsPageState extends State<ReportsPage> {
 
   Future<void> _filterToday() async {
     final db = await DatabaseHelper.instance.database;
+    final todayDay = DateTime.now().day.toString();
 
-    // Format today's date as 'dd-MM-yyyy' to match DB format
-    final today = DateFormat('d-M-yyyy').format(DateTime.now());
-
-    final List<Map<String, dynamic>> result = await db.query(
-      'transactions',
-      where: "date = ?",
-      whereArgs: [today],
-      orderBy: 'date DESC',
-    );
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+    SELECT * FROM transactions
+    WHERE substr(date, 1, instr(date, '-') - 1) = ?
+      AND status = ?
+    ORDER BY date DESC
+  ''', [todayDay, _showRunning ? 1 : 0]);
 
     setState(() {
+      _currentFilter = 'today';
       _filteredTransactions = result;
     });
-
-    print("Filtered ${result.length} transactions for today ($today)");
   }
-
-
 
   Future<void> _filterYesterday() async {
     final db = await DatabaseHelper.instance.database;
+    final yesterdayDay = DateTime.now().subtract(const Duration(days: 1)).day.toString();
 
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final formatted = DateFormat('d-M-yyyy').format(yesterday); // Match DB format
-
-    final List<Map<String, dynamic>> result = await db.query(
-      'transactions',
-      where: "date = ?",
-      whereArgs: [formatted],
-      orderBy: 'date DESC',
-    );
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+    SELECT * FROM transactions
+    WHERE substr(date, 1, instr(date, '-') - 1) = ?
+      AND status = ?
+    ORDER BY date DESC
+  ''', [yesterdayDay, _showRunning ? 1 : 0]);
 
     setState(() {
+      _currentFilter = 'yesterday';
       _filteredTransactions = result;
     });
-
   }
-
 
   void _filterThisMonth() {
-    final now = DateTime.now();
+    final today = DateTime.now();
+    final int todayDay = today.day;
+
     setState(() {
+      _currentFilter = 'thisMonth';
       _filteredTransactions = _transactions.where((tx) {
         final dateStr = tx['date'];
         DateTime? date;
-
-        try {
-          date = DateFormat('dd-MM-yyyy').parse(dateStr);
-        } catch (e) {
-          // If parsing fails, treat as invalid
-          return false;
-        }
-
-        return date.year == now.year && date.month == now.month;
-      }).toList();
-    });
-  }
-
-
-  void _filterThisYear() {
-    final now = DateTime.now();
-    setState(() {
-      _filteredTransactions = _transactions.where((tx) {
-        final dateStr = tx['date'];
-        DateTime? date;
-
         try {
           date = DateFormat('dd-MM-yyyy').parse(dateStr);
         } catch (e) {
           return false;
         }
 
-        return date.year == now.year;
+        return date.day >= 1 &&
+            date.day <= todayDay &&
+            tx['status'] == (_showRunning ? 1 : 0);
       }).toList();
     });
   }
-
-
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+  Future<DateTime?> _pickDate() async {
+    return await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
@@ -325,28 +302,39 @@ class _ReportsPageState extends State<ReportsPage> {
         );
       },
     );
+  }
 
+
+  void selectdate(DateTime picked) {
+    setState(() {
+      _currentFilter = 'selectdate';
+      _filteredTransactions = _transactions.where((tx) {
+        final dateStr = tx['date'];
+        DateTime? date;
+        try {
+          date = DateFormat('dd-MM-yyyy').parse(dateStr);
+        } catch (e) {
+          return false;
+        }
+        return date.year == picked.year &&
+            date.month == picked.month &&
+            date.day == picked.day &&
+            tx['status'] == (_showRunning ? 1 : 0);
+      }).toList();
+    });
+  }
+  void _onSelectDatePressed() async {
+    final picked = await _pickDate();
     if (picked != null) {
-      final formatted = DateFormat('dd-MM-yyyy').format(picked);
-      setState(() {
-        _filteredTransactions = _transactions.where((tx) {
-          final dateStr = tx['date'];
-          DateTime? date;
-
-          try {
-            date = DateFormat('dd-MM-yyyy').parse(dateStr);
-          } catch (e) {
-            return false;
-          }
-          return date.year == picked.year && date.month == picked.month && date.day == picked.day;
-        }).toList();
-      });
+      selectdate(picked);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please select a date to filter.")),
       );
     }
   }
+
+
   Future<void> _generatePdfReport() async {
     final pdf = pw.Document();
 
@@ -424,7 +412,24 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-
+  void _applyCurrentFilter() {
+    switch (_currentFilter) {
+      case 'today':
+        _filterToday();
+        break;
+      case 'yesterday':
+        _filterYesterday();
+        break;
+      case 'thisMonth':
+        _filterThisMonth();
+        break;
+      case 'selectdate':
+        _onSelectDatePressed();
+        break;
+      default:
+        _fetchData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -453,13 +458,10 @@ class _ReportsPageState extends State<ReportsPage> {
                   _filterYesterday();
                   break;
                 case 'select_date':
-                  _selectDate();
+                  _onSelectDatePressed();
                   break;
                 case 'this_month':
                   _filterThisMonth();
-                  break;
-                case 'this_year':
-                  _filterThisYear();
                   break;
                 case 'till_now':
                   _loadTransactions();
@@ -484,94 +486,118 @@ class _ReportsPageState extends State<ReportsPage> {
                     Icons.calendar_month,
                     'this_month',
                   ),
-                  _buildPopupItem("This Year", Icons.event, 'this_year'),
                   _buildPopupItem("Till Now", Icons.history, 'till_now'),
                 ],
           ),
         ],
       ),
-
       body: Column(
         children: [
-          // 🔄 Circular loading indicator (visible only when loading)
-          if (_isLoading)
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Center(
-                child: CircularProgressIndicator(color: primary_color),
-              ),
+          // Search Bar
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: primary_color, width: 1.5),
             ),
-
-          // 🔍 Search Bar
-          if (!_isLoading)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: primary_color, width: 1.5),
-              ),
-              child: TextField(
-                controller: _searchController,
-                onChanged: _filterSearchResults,
-                decoration: InputDecoration(
-                  hintText: 'Search by Name or Account No.',
-                  prefixIcon: Icon(Icons.search, color: primary_color),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
-                  ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterSearchResults,
+              decoration: InputDecoration(
+                hintText: 'Search by Name or Account No.',
+                prefixIcon: Icon(Icons.search, color: primary_color),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
                 ),
               ),
             ),
+          ),
+          // Radio buttons for Running/Closed
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Radio<bool>(
+                  value: true,
+                  groupValue: _showRunning,
+                  onChanged: (value) {
+                    if (value != null && value != _showRunning) {
+                      setState(() => _showRunning = value);
+                      _applyCurrentFilter();
+                    }
+                  },
+                  activeColor: primary_color,
+                ),
 
-          // 📋 Transaction List
+                const Text('Running'),
+                const SizedBox(width: 20),
+                Radio<bool>(
+                  value: false,
+                  groupValue: _showRunning,
+                  onChanged: (value) {
+                    if (value != null && value != _showRunning) {
+                      setState(() => _showRunning = value);
+                      _applyCurrentFilter();
+                    }
+                  },
+                  activeColor: primary_color,
+                ),
+
+                const Text('Closed'),
+              ],
+            ),
+          ),
+          // Transaction List
           Expanded(
             child:
                 _isLoading
-                    ? const SizedBox() // Already showing progress above
+                    ? const Center(
+                        child: CircularProgressIndicator(color: primary_color),
+                      )
                     : _filteredTransactions.isEmpty
                     ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 70,
-                            color: primary_color.withOpacity(0.4),
-                          ),
-                          const SizedBox(height: 15),
-                          Text(
-                            "No Transactions Found",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade700,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.receipt_long_outlined,
+                              size: 70,
+                              color: primary_color.withOpacity(0.4),
                             ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            "Try adding a new transaction.",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
+                            const SizedBox(height: 15),
+                            Text(
+                              "No Transactions Found",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade700,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    )
+                            const SizedBox(height: 5),
+                            Text(
+                              "Try adding a new transaction.",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                     : ListView.builder(
-                      itemCount: _filteredTransactions.length,
-                      itemBuilder: (context, index) {
-                        return buildTransactionCard(
-                          _filteredTransactions[index],
-                        );
-                      },
-                    ),
+                        itemCount: _filteredTransactions.length,
+                        itemBuilder: (context, index) {
+                          return buildTransactionCard(
+                            _filteredTransactions[index],
+                          );
+                        },
+                      ),
           ),
-
-          // 🖨️ Print Button
+          // Print Button (unchanged)
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.all(16.0),
