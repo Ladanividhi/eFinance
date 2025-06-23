@@ -21,7 +21,8 @@ class _ReportsPageState extends State<ReportsPage> {
   TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   bool _showRunning = true; // true for running, false for closed
-  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth'
+  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth', 'selectdate'
+  DateTime? _selectedDate; // Store the last picked date
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _ReportsPageState extends State<ReportsPage> {
     );
 
     setState(() {
+      _currentFilter = 'tillnow';
       _transactions = result;
       _filteredTransactions = result;
     });
@@ -287,6 +289,7 @@ class _ReportsPageState extends State<ReportsPage> {
       }).toList();
     });
   }
+
   Future<DateTime?> _pickDate() async {
     return await showDatePicker(
       context: context,
@@ -308,6 +311,7 @@ class _ReportsPageState extends State<ReportsPage> {
   void selectdate(DateTime picked) {
     setState(() {
       _currentFilter = 'selectdate';
+      _selectedDate = picked;
       _filteredTransactions = _transactions.where((tx) {
         final dateStr = tx['date'];
         DateTime? date;
@@ -316,21 +320,24 @@ class _ReportsPageState extends State<ReportsPage> {
         } catch (e) {
           return false;
         }
-        return date.year == picked.year &&
-            date.month == picked.month &&
-            date.day == picked.day &&
+        return date.day == picked.day &&
             tx['status'] == (_showRunning ? 1 : 0);
       }).toList();
     });
   }
+
   void _onSelectDatePressed() async {
-    final picked = await _pickDate();
-    if (picked != null) {
-      selectdate(picked);
+    if (_selectedDate == null) {
+      final picked = await _pickDate();
+      if (picked != null) {
+        selectdate(picked);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select a date to filter.")),
+        );
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a date to filter.")),
-      );
+      selectdate(_selectedDate!);
     }
   }
 
@@ -424,7 +431,14 @@ class _ReportsPageState extends State<ReportsPage> {
         _filterThisMonth();
         break;
       case 'selectdate':
-        _onSelectDatePressed();
+        if (_selectedDate != null) {
+          selectdate(_selectedDate!);
+        } else {
+          _onSelectDatePressed();
+        }
+        break;
+      case 'tillnow':
+        _loadTransactions();
         break;
       default:
         _fetchData();
@@ -450,6 +464,7 @@ class _ReportsPageState extends State<ReportsPage> {
               borderRadius: BorderRadius.circular(15),
             ),
             onSelected: (value) {
+              setState(() {}); // Force refresh
               switch (value) {
                 case 'today':
                   _filterToday();
@@ -458,6 +473,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   _filterYesterday();
                   break;
                 case 'select_date':
+                  _selectedDate = null;
                   _onSelectDatePressed();
                   break;
                 case 'this_month':
@@ -526,7 +542,9 @@ class _ReportsPageState extends State<ReportsPage> {
                   groupValue: _showRunning,
                   onChanged: (value) {
                     if (value != null && value != _showRunning) {
-                      setState(() => _showRunning = value);
+                      setState(() {
+                        _showRunning = value;
+                      });
                       _applyCurrentFilter();
                     }
                   },
@@ -540,7 +558,9 @@ class _ReportsPageState extends State<ReportsPage> {
                   groupValue: _showRunning,
                   onChanged: (value) {
                     if (value != null && value != _showRunning) {
-                      setState(() => _showRunning = value);
+                      setState(() {
+                        _showRunning = value;
+                      });
                       _applyCurrentFilter();
                     }
                   },

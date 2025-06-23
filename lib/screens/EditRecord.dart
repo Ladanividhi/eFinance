@@ -16,6 +16,8 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
   bool _showRunning = true; // true for running, false for closed
+  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth', 'selectdate', 'tillnow'
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -23,50 +25,25 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
     _fetchData();
   }
 
-  void _fetchData() async {
-    print('Fetching data...');
+  Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-    try {
-      await _loadTransactions();
-    } catch (e, st) {
-      print('Error in _fetchData:');
-      print(e);
-      print(st);
-    }
+    await _loadTransactions();
     setState(() => _isLoading = false);
   }
 
   Future<void> _loadTransactions() async {
-    print('Loading transactions...');
-    try {
     final db = await DatabaseHelper.instance.database;
-      print('Database opened.');
     final List<Map<String, dynamic>> result = await db.query(
       'transactions',
       where: 'status = ?',
-        whereArgs: [_showRunning ? 1 : 0],
+      whereArgs: [_showRunning ? 1 : 0],
       orderBy: 'date DESC',
     );
-      print('Query complete. Rows: \\${result.length}');
-
-      String query = _searchController.text;
-      final filtered = result.where((transaction) {
-        final fullName =
-            transaction['full_name']?.toString().toLowerCase() ?? '';
-        final accountNumber = transaction['account_number']?.toString() ?? '';
-        return fullName.contains(query.toLowerCase()) ||
-            accountNumber.contains(query);
-      }).toList();
-
-      setState(() {
-        _transactions = result;
-        _filteredTransactions = filtered;
-      });
-    } catch (e, st) {
-      print('Error in _loadTransactions:');
-      print(e);
-      print(st);
-    }
+    setState(() {
+      _currentFilter = 'tillnow';
+      _transactions = result;
+      _filteredTransactions = result;
+    });
   }
 
   void _filterSearchResults(String query) {
@@ -248,7 +225,6 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text("Status changed to $newStatus"),
-                    backgroundColor: Colors.green,
                   ),
                 );
                 _fetchData(); // refresh list
@@ -469,87 +445,56 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   }
   Future<void> _filterToday() async {
     final db = await DatabaseHelper.instance.database;
-
-    // Format today's date as 'dd-MM-yyyy' to match DB format
-    final today = DateFormat('d-M-yyyy').format(DateTime.now());
-
-    final List<Map<String, dynamic>> result = await db.query(
-      'transactions',
-      where: "date = ?",
-      whereArgs: [today],
-      orderBy: 'date DESC',
-    );
-
+    final todayDay = DateTime.now().day.toString();
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT * FROM transactions
+      WHERE substr(date, 1, instr(date, '-') - 1) = ?
+        AND status = ?
+      ORDER BY date DESC
+    ''', [todayDay, _showRunning ? 1 : 0]);
     setState(() {
+      _currentFilter = 'today';
       _filteredTransactions = result;
     });
-
-    print("Filtered ${result.length} transactions for today ($today)");
   }
-
-
 
   Future<void> _filterYesterday() async {
     final db = await DatabaseHelper.instance.database;
-
-    final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final formatted = DateFormat('d-M-yyyy').format(yesterday); // Match DB format
-
-    final List<Map<String, dynamic>> result = await db.query(
-      'transactions',
-      where: "date = ?",
-      whereArgs: [formatted],
-      orderBy: 'date DESC',
-    );
-
+    final yesterdayDay = DateTime.now().subtract(const Duration(days: 1)).day.toString();
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT * FROM transactions
+      WHERE substr(date, 1, instr(date, '-') - 1) = ?
+        AND status = ?
+      ORDER BY date DESC
+    ''', [yesterdayDay, _showRunning ? 1 : 0]);
     setState(() {
+      _currentFilter = 'yesterday';
       _filteredTransactions = result;
     });
-
   }
-
 
   void _filterThisMonth() {
-    final now = DateTime.now();
+    final today = DateTime.now();
+    final int todayDay = today.day;
     setState(() {
+      _currentFilter = 'thisMonth';
       _filteredTransactions = _transactions.where((tx) {
         final dateStr = tx['date'];
         DateTime? date;
-
-        try {
-          date = DateFormat('dd-MM-yyyy').parse(dateStr);
-        } catch (e) {
-          // If parsing fails, treat as invalid
-          return false;
-        }
-
-        return date.year == now.year && date.month == now.month;
-      }).toList();
-    });
-  }
-
-
-  void _filterThisYear() {
-    final now = DateTime.now();
-    setState(() {
-      _filteredTransactions = _transactions.where((tx) {
-        final dateStr = tx['date'];
-        DateTime? date;
-
         try {
           date = DateFormat('dd-MM-yyyy').parse(dateStr);
         } catch (e) {
           return false;
         }
-
-        return date.year == now.year;
+        return date.day >= 1 &&
+            date.day <= todayDay &&
+            tx['status'] == (_showRunning ? 1 : 0);
       }).toList();
     });
   }
 
-
-  Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+  Future<DateTime?> _pickDate() async {
+    return await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
@@ -563,26 +508,64 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
         );
       },
     );
+  }
 
-    if (picked != null) {
-      final formatted = DateFormat('dd-MM-yyyy').format(picked);
-      setState(() {
-        _filteredTransactions = _transactions.where((tx) {
-          final dateStr = tx['date'];
-          DateTime? date;
+  void selectdate(DateTime picked) {
+    setState(() {
+      _currentFilter = 'selectdate';
+      _selectedDate = picked;
+      _filteredTransactions = _transactions.where((tx) {
+        final dateStr = tx['date'];
+        DateTime? date;
+        try {
+          date = DateFormat('dd-MM-yyyy').parse(dateStr);
+        } catch (e) {
+          return false;
+        }
+        return date.day == picked.day &&
+            tx['status'] == (_showRunning ? 1 : 0);
+      }).toList();
+    });
+  }
 
-          try {
-            date = DateFormat('dd-MM-yyyy').parse(dateStr);
-    } catch (e) {
-            return false;
-          }
-          return date.year == picked.year && date.month == picked.month && date.day == picked.day;
-        }).toList();
-      });
+  void _onSelectDatePressed() async {
+    if (_selectedDate == null) {
+      final picked = await _pickDate();
+      if (picked != null) {
+        selectdate(picked);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please select a date to filter.")),
+        );
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select a date to filter.")),
-      );
+      selectdate(_selectedDate!);
+    }
+  }
+
+  void _applyCurrentFilter() {
+    switch (_currentFilter) {
+      case 'today':
+        _filterToday();
+        break;
+      case 'yesterday':
+        _filterYesterday();
+        break;
+      case 'thisMonth':
+        _filterThisMonth();
+        break;
+      case 'selectdate':
+        if (_selectedDate != null) {
+          selectdate(_selectedDate!);
+        } else {
+          _onSelectDatePressed();
+        }
+        break;
+      case 'tillnow':
+        _loadTransactions();
+        break;
+      default:
+        _fetchData();
     }
   }
 
@@ -605,23 +588,27 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               borderRadius: BorderRadius.circular(15),
             ),
             onSelected: (value) {
+              setState(() {}); // Force refresh
               switch (value) {
                 case 'today':
+                  _currentFilter = 'today';
                   _filterToday();
                   break;
                 case 'yesterday':
+                  _currentFilter = 'yesterday';
                   _filterYesterday();
                   break;
                 case 'select_date':
-                  _selectDate();
+                  _currentFilter = 'selectdate';
+                  _selectedDate = null;
+                  _onSelectDatePressed();
                   break;
-                case 'this_month':
+                case 'thisMonth':
+                  _currentFilter = 'thisMonth';
                   _filterThisMonth();
                   break;
-                case 'this_year':
-                  _filterThisYear();
-                  break;
-                case 'till_now':
+                case 'tillnow':
+                  _currentFilter = 'tillnow';
                   _loadTransactions();
                   break;
               }
@@ -642,10 +629,9 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               _buildPopupItem(
                 "This Month",
                 Icons.calendar_month,
-                'this_month',
+                'thisMonth',
               ),
-              _buildPopupItem("This Year", Icons.event, 'this_year'),
-              _buildPopupItem("Till Now", Icons.history, 'till_now'),
+              _buildPopupItem("Till Now", Icons.history, 'tillnow'),
             ],
           ),
         ],
@@ -686,35 +672,39 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
                 child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Radio<bool>(
-                        value: true,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Radio<bool>(
+                      value: true,
                       groupValue: _showRunning,
-                        onChanged: (value) {
+                      onChanged: (value) {
                         if (value != null && value != _showRunning) {
-                          setState(() => _showRunning = value);
-                          _fetchData();
+                          setState(() {
+                            _showRunning = value;
+                          });
+                          _applyCurrentFilter();
                         }
-                        },
-                        activeColor: primary_color,
-                      ),
+                      },
+                      activeColor: primary_color,
+                    ),
                     const Text('Running'),
-                      const SizedBox(width: 20),
-                      Radio<bool>(
-                        value: false,
+                    const SizedBox(width: 20),
+                    Radio<bool>(
+                      value: false,
                       groupValue: _showRunning,
-                        onChanged: (value) {
+                      onChanged: (value) {
                         if (value != null && value != _showRunning) {
-                          setState(() => _showRunning = value);
-                          _fetchData();
+                          setState(() {
+                            _showRunning = value;
+                          });
+                          _applyCurrentFilter();
                         }
-                        },
-                        activeColor: primary_color,
-                      ),
+                      },
+                      activeColor: primary_color,
+                    ),
                     const Text('Closed'),
-                    ],
-                  ),
+                  ],
+                ),
               ),
               // Transaction List
             Expanded(
@@ -738,13 +728,6 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                               ),
                             ),
                             const SizedBox(height: 5),
-                    Text(
-                              "No records match the current filter.",
-                      style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                      ),
-                    ),
                   ],
                 ),
               )
