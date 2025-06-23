@@ -1,5 +1,6 @@
 
 import 'package:eFinance/screens/AddTransaction.dart';
+import 'package:eFinance/screens/EditRecord.dart';
 import 'package:eFinance/screens/Login.dart';
 import 'package:eFinance/screens/Reports.dart';
 import 'package:eFinance/screens/SearchScreen.dart';
@@ -137,6 +138,19 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ReportsPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_calendar, color: primary_color),
+              title: const Text(
+                'Edit Records',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EditRecordsPage()),
                 );
               },
             ),

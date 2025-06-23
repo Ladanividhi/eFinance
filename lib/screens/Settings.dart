@@ -1,3 +1,4 @@
+import 'package:eFinance/screens/AboutUs.dart';
 import 'package:eFinance/screens/ChangePassword.dart';
 import 'package:eFinance/screens/EditRecord.dart';
 import 'package:eFinance/utils/Constants.dart';
@@ -59,10 +60,10 @@ class _SettingsPageState extends State<SettingsPage> {
             title: 'About Us',
             icon: Icons.info_outline_rounded,
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => const AboutUsPage()),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutUsPage()),
+              );
             },
           ),
 
