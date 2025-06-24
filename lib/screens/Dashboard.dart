@@ -7,6 +7,11 @@ import 'package:eFinance/screens/SearchScreen.dart';
 import 'package:eFinance/screens/Settings.dart';
 import 'package:eFinance/utils/Constants.dart';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path/path.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pie_chart/pie_chart.dart';
 
@@ -84,7 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
     await prefs.remove('user_name');
 
     Navigator.pushAndRemoveUntil(
-      context,
+      context as BuildContext,
       MaterialPageRoute(builder: (_) => const LoginPage()),
           (route) => false,
     );
@@ -131,6 +136,29 @@ class _DashboardPageState extends State<DashboardPage> {
         Expanded(child: _buildStatCard(title2, value2)),
       ],
     );
+  }
+  Future<void> _shareDatabase() async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final filePath = join(dbPath, 'efinance.db');
+
+      final file = File(filePath);
+
+      if (await file.exists()) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Sharing my eFinance Database 📊',
+        );
+      } else {
+        ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+          const SnackBar(content: Text('Database file not found!')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+        SnackBar(content: Text('Error sharing database: $e')),
+      );
+    }
   }
 
 
@@ -248,7 +276,29 @@ class _DashboardPageState extends State<DashboardPage> {
                 'Share Database',
                 style: TextStyle(fontWeight: FontWeight.w500),
               ),
-              onTap: () {},
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Share Database"),
+                    content: const Text("Are you sure you want to share your entire database file?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _shareDatabase();
+                        },
+                        child: const Text("Yes, Share"),
+                      ),
+                    ],
+                  ),
+                );
+              },
+
             ),
             ListTile(
               leading: const Icon(Icons.monetization_on_rounded, color: primary_color),
