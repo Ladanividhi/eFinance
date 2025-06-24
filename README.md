@@ -52,14 +52,14 @@ Built for individuals and small businesses to track running and closed loan acco
 ## 📸 App Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/dashboard1.jpg" alt="Screenshot 1" width="150"/>
-  <img src="assets/screenshots/Dashboard2.jpg" alt="Screenshot 2" width="150"/>
-  <img src="assets/screenshots/dashboard3.jpg" alt="Screenshot 3" width="150"/>
-  <img src="assets/screenshots/add_transaction.jpg" alt="Screenshot 4" width="150"/>
-  <img src="assets/screenshots/edit_records.jpg" alt="Screenshot 5" width="150"/>
-  <img src="assets/screenshots/login.jpg" alt="Screenshot 6" width="150"/>
-  <img src="assets/screenshots/reports.jpg" alt="Screenshot 7" width="150"/>
-  <img src="assets/screenshots/pdf.jpg" alt="Screenshot 8" width="150"/>
+  <img src="assets/screenshots/dashboard1.jpg" alt="Screenshot 1" width="180"/>
+  <img src="assets/screenshots/Dashboard2.jpg" alt="Screenshot 2" width="180"/>
+  <img src="assets/screenshots/dashboard3.jpg" alt="Screenshot 3" width="180"/>
+  <img src="assets/screenshots/add_transaction.jpg" alt="Screenshot 4" width="180"/>
+  <img src="assets/screenshots/edit_records.jpg" alt="Screenshot 5" width="180"/>
+  <img src="assets/screenshots/login.jpg" alt="Screenshot 6" width="180"/>
+  <img src="assets/screenshots/reports.jpg" alt="Screenshot 7" width="180"/>
+  <img src="assets/screenshots/pdf.jpg" alt="Screenshot 8" width="180"/>
 </p>
 
 ---
@@ -80,8 +80,6 @@ Built for individuals and small businesses to track running and closed loan acco
 2. Run `flutter pub get`
 3. Launch using your preferred emulator or real device
 4. Enjoy managing finances offline 📊
-
----
 
 ---
 
