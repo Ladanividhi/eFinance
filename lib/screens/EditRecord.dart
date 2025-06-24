@@ -15,9 +15,11 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   List<Map<String, dynamic>> _filteredTransactions = [];
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = true;
-  bool _showRunning = true; // true for running, false for closed
-  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth', 'selectdate', 'tillnow'
+  bool _showRunning = true;
+  String _currentFilter = 'today';
   DateTime? _selectedDate;
+
+  int a = 0;
 
   @override
   void initState() {
@@ -27,7 +29,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
 
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
-    await _loadTransactions();
+    await _filterToday();
     setState(() => _isLoading = false);
   }
 
@@ -47,30 +49,82 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   }
 
   void _filterSearchResults(String query) {
-    final filtered = _transactions.where((transaction) {
-      final fullName =
-          transaction['full_name']?.toString().toLowerCase() ?? '';
-      final accountNumber = transaction['account_number']?.toString() ?? '';
-      return fullName.contains(query.toLowerCase()) ||
-          accountNumber.contains(query);
-    }).toList();
+    final filtered =
+        _transactions.where((transaction) {
+          final fullName =
+              transaction['full_name']?.toString().toLowerCase() ?? '';
+          final accountNumber = transaction['account_number']?.toString() ?? '';
+          return fullName.contains(query.toLowerCase()) ||
+              accountNumber.contains(query);
+        }).toList();
 
     setState(() {
       _filteredTransactions = filtered;
     });
   }
 
-  void _deleteTransaction(int id) async {
+  void _confirmDeleteTransaction(int id) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Delete Transaction',
+            style: TextStyle(fontWeight: FontWeight.bold, color: primary_color),
+          ),
+          content: Text('Are you sure you want to delete this transaction?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel', style: TextStyle(color: primary_color)),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+              child: const Text('Yes, Delete', style: TextStyle(color: Colors.white)),
+              onPressed: () async {
+                await _deleteTransaction(id);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteTransaction(int id) async {
     final db = await DatabaseHelper.instance.database;
     await db.delete('transactions', where: 'id = ?', whereArgs: [id]);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Transaction deleted successfully'),
-        backgroundColor: Colors.green,
       ),
     );
-    _fetchData(); // Refresh the list
+
+    // Refresh according to 'a'
+    switch (a) {
+      case 0:
+        _filterToday();
+        break;
+      case 1:
+        _filterYesterday();
+        break;
+      case 2:
+        if (_selectedDate != null) {
+          selectdate(_selectedDate!);
+        }
+        break;
+      case 3:
+        _filterTillNow();
+        break;
+      case 4:
+        _filterAll();
+        break;
+      default:
+        _fetchData();
+    }
   }
+
 
   String formatDate(String date) {
     try {
@@ -137,9 +191,21 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _buildInfoRow(Icons.account_box, "Account No", "${data['account_number']}"),
-                      _buildInfoRow(Icons.account_balance_wallet, "Balance", "₹${data['balance']}"),
-                      _buildInfoRow(Icons.calendar_today, "Date", formatDate(data['date'])),
+                      _buildInfoRow(
+                        Icons.account_box,
+                        "Account No",
+                        "${data['account_number']}",
+                      ),
+                      _buildInfoRow(
+                        Icons.account_balance_wallet,
+                        "Balance",
+                        "₹${data['balance']}",
+                      ),
+                      _buildInfoRow(
+                        Icons.calendar_today,
+                        "Date",
+                        formatDate(data['date']),
+                      ),
                     ],
                   ),
                 ),
@@ -153,9 +219,13 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                       },
                     ),
                     IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red.shade700, size: 24),
+                      icon: Icon(
+                        Icons.delete,
+                        color: Colors.red.shade700,
+                        size: 24,
+                      ),
                       onPressed: () {
-                        _deleteTransaction(data['id']);
+                        _confirmDeleteTransaction(data['id']);
                       },
                     ),
                   ],
@@ -169,8 +239,13 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primary_color,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                 ),
                 icon: const Icon(Icons.change_circle, color: Colors.white),
                 label: const Text(
@@ -207,7 +282,10 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
           ),
           actions: [
             TextButton(
-              child: const Text("Cancel", style: TextStyle(color: primary_color)),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: primary_color),
+              ),
               onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
@@ -223,11 +301,29 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                 );
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Status changed to $newStatus"),
-                  ),
+                  SnackBar(content: Text("Status changed to $newStatus")),
                 );
-                _fetchData(); // refresh list
+                switch (a) {
+                  case 0:
+                    _filterToday();
+                    break;
+                  case 1:
+                    _filterYesterday();
+                    break;
+                  case 2:
+                    if (_selectedDate != null) {
+                      selectdate(_selectedDate!);
+                    }
+                    break;
+                  case 3:
+                    _filterTillNow();
+                    break;
+                  case 4:
+                    _filterAll();
+                    break;
+                  default:
+                    _fetchData();
+                }
               },
             ),
           ],
@@ -237,17 +333,39 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
   }
 
   void _showEditDialog(Map<String, dynamic> data) {
-    TextEditingController nameController = TextEditingController(text: data['full_name']);
-    TextEditingController accountController = TextEditingController(text: data['account_number'].toString());
-    TextEditingController contactController = TextEditingController(text: data['contact_number'] ?? '');
-    TextEditingController addressController = TextEditingController(text: data['address'] ?? '');
-    TextEditingController guarantorController = TextEditingController(text: data['guarantor_name'] ?? '');
-    TextEditingController loanAmountController = TextEditingController(text: data['loan_amount'].toString());
-    TextEditingController interestController = TextEditingController(text: data['interest'].toString());
-    TextEditingController cfBalanceController = TextEditingController(text: data['cf_balance'].toString());
-    TextEditingController withdrawalController = TextEditingController(text: data['withdrawal_amount'].toString());
-    TextEditingController creditController = TextEditingController(text: data['credit_amount'].toString());
-    TextEditingController dateController = TextEditingController(text: data['date'] ?? '');
+    TextEditingController nameController = TextEditingController(
+      text: data['full_name'],
+    );
+    TextEditingController accountController = TextEditingController(
+      text: data['account_number'].toString(),
+    );
+    TextEditingController contactController = TextEditingController(
+      text: data['contact_number'] ?? '',
+    );
+    TextEditingController addressController = TextEditingController(
+      text: data['address'] ?? '',
+    );
+    TextEditingController guarantorController = TextEditingController(
+      text: data['guarantor_name'] ?? '',
+    );
+    TextEditingController loanAmountController = TextEditingController(
+      text: data['loan_amount'].toString(),
+    );
+    TextEditingController interestController = TextEditingController(
+      text: data['interest'].toString(),
+    );
+    TextEditingController cfBalanceController = TextEditingController(
+      text: data['cf_balance'].toString(),
+    );
+    TextEditingController withdrawalController = TextEditingController(
+      text: data['withdrawal_amount'].toString(),
+    );
+    TextEditingController creditController = TextEditingController(
+      text: data['credit_amount'].toString(),
+    );
+    TextEditingController dateController = TextEditingController(
+      text: data['date'] ?? '',
+    );
 
     double balance = data['balance'];
     int statusValue = data['status'];
@@ -266,169 +384,244 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Edit Transaction", style: TextStyle(color: primary_color, fontWeight: FontWeight.bold)),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Full Name')),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: accountController,
-                    decoration: const InputDecoration(labelText: 'Account No'),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(controller: contactController, decoration: const InputDecoration(labelText: 'Contact No')),
-                  const SizedBox(height: 8),
-                  TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
-                  const SizedBox(height: 8),
-                  TextField(controller: guarantorController, decoration: const InputDecoration(labelText: 'Guarantor Name')),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: loanAmountController,
-                    decoration: const InputDecoration(labelText: 'Loan Amount'),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: interestController,
-                    decoration: const InputDecoration(labelText: 'Interest'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      setState(() => recalculateBalance());
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: cfBalanceController,
-                    decoration: const InputDecoration(labelText: 'CF Balance'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      setState(() => recalculateBalance());
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: withdrawalController,
-                    decoration: const InputDecoration(labelText: 'Withdrawal Amount'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      setState(() => recalculateBalance());
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: creditController,
-                    decoration: const InputDecoration(labelText: 'Credit Amount'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      setState(() => recalculateBalance());
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: dateController,
-                    decoration: const InputDecoration(labelText: 'Date'),
-                    readOnly: true,
-                    onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.tryParse(dateController.text) ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                        builder: (context, child) {
-                          return Theme(
-                            data: ThemeData(
-                              primaryColor: primary_color,
-                              colorScheme: ColorScheme.light(primary: primary_color),
-                            ),
-                            child: child!,
-                          );
-                        },
-                      );
-                      if (pickedDate != null) {
-                        setState(() {
-                          dateController.text = DateFormat('yyyy-MM-dd').format(pickedDate);
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    enabled: false,
-                    controller: TextEditingController(text: "₹${balance.toStringAsFixed(2)}"),
-                    decoration: const InputDecoration(labelText: 'Balance'),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<int>(
-                    value: statusValue,
-                    decoration: const InputDecoration(labelText: 'Status'),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text("Running")),
-                      DropdownMenuItem(value: 0, child: Text("Closed")),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          statusValue = val;
-                        });
-                      }
-                    },
-                  ),
-                ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text(
+                "Edit Transaction",
+                style: TextStyle(
+                  color: primary_color,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            actions: [
-              TextButton(
-                child: const Text("Cancel", style: TextStyle(color: primary_color)),
-                onPressed: () => Navigator.of(context).pop(),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Full Name'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: accountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Account No',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: contactController,
+                      decoration: const InputDecoration(
+                        labelText: 'Contact No',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: addressController,
+                      decoration: const InputDecoration(labelText: 'Address'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: guarantorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Guarantor Name',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: loanAmountController,
+                      decoration: const InputDecoration(
+                        labelText: 'Loan Amount',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: interestController,
+                      decoration: const InputDecoration(labelText: 'Interest'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        setState(() => recalculateBalance());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: cfBalanceController,
+                      decoration: const InputDecoration(
+                        labelText: 'CF Balance',
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        setState(() => recalculateBalance());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: withdrawalController,
+                      decoration: const InputDecoration(
+                        labelText: 'Withdrawal Amount',
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        setState(() => recalculateBalance());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: creditController,
+                      decoration: const InputDecoration(
+                        labelText: 'Credit Amount',
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        setState(() => recalculateBalance());
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: dateController,
+                      decoration: const InputDecoration(labelText: 'Date'),
+                      readOnly: true,
+                      onTap: () async {
+                        DateTime? pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              DateTime.tryParse(dateController.text) ??
+                              DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData(
+                                primaryColor: primary_color,
+                                colorScheme: ColorScheme.light(
+                                  primary: primary_color,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (pickedDate != null) {
+                          setState(() {
+                            dateController.text = DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(pickedDate);
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      enabled: false,
+                      controller: TextEditingController(
+                        text: "₹${balance.toStringAsFixed(2)}",
+                      ),
+                      decoration: const InputDecoration(labelText: 'Balance'),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      value: statusValue,
+                      decoration: const InputDecoration(labelText: 'Status'),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text("Running")),
+                        DropdownMenuItem(value: 0, child: Text("Closed")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            statusValue = val;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: primary_color),
-                child: const Text("Update", style: TextStyle(color: Colors.white)),
-                onPressed: () async {
-                  final db = await DatabaseHelper.instance.database;
-                  await db.update(
-                    'transactions',
-                    {
-                      'full_name': nameController.text,
-                      'account_number': int.tryParse(accountController.text),
-                      'contact_number': contactController.text,
-                      'address': addressController.text,
-                      'guarantor_name': guarantorController.text,
-                      'loan_amount': double.tryParse(loanAmountController.text) ?? 0.0,
-                      'interest': double.tryParse(interestController.text) ?? 0.0,
-                      'cf_balance': double.tryParse(cfBalanceController.text) ?? 0.0,
-                      'withdrawal_amount': double.tryParse(withdrawalController.text) ?? 0.0,
-                      'credit_amount': double.tryParse(creditController.text) ?? 0.0,
-                      'balance': balance,
-                      'date': dateController.text,
-                      'status': statusValue,
-                    },
-                    where: 'id = ?',
-                    whereArgs: [data['id']],
-                  );
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Transaction updated")),
-                  );
-                  _fetchData();
-                },
-              )
-            ],
-          );
-        });
+              actions: [
+                TextButton(
+                  child: const Text(
+                    "Cancel",
+                    style: TextStyle(color: primary_color),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary_color,
+                  ),
+                  child: const Text(
+                    "Update",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onPressed: () async {
+                    final db = await DatabaseHelper.instance.database;
+                    await db.update(
+                      'transactions',
+                      {
+                        'full_name': nameController.text,
+                        'account_number': int.tryParse(accountController.text),
+                        'contact_number': contactController.text,
+                        'address': addressController.text,
+                        'guarantor_name': guarantorController.text,
+                        'loan_amount':
+                            double.tryParse(loanAmountController.text) ?? 0.0,
+                        'interest':
+                            double.tryParse(interestController.text) ?? 0.0,
+                        'cf_balance':
+                            double.tryParse(cfBalanceController.text) ?? 0.0,
+                        'withdrawal_amount':
+                            double.tryParse(withdrawalController.text) ?? 0.0,
+                        'credit_amount':
+                            double.tryParse(creditController.text) ?? 0.0,
+                        'balance': balance,
+                        'date': dateController.text,
+                        'status': statusValue,
+                      },
+                      where: 'id = ?',
+                      whereArgs: [data['id']],
+                    );
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Transaction updated")),
+                    );
+                    switch (a) {
+                      case 0:
+                        _filterToday();
+                        break;
+                      case 1:
+                        _filterYesterday();
+                        break;
+                      case 2:
+                        if (_selectedDate != null) {
+                          selectdate(_selectedDate!);
+                        }
+                        break;
+                      case 3:
+                        _filterTillNow();
+                        break;
+                      case 4:
+                        _filterAll();
+                        break;
+                      default:
+                        _fetchData();
+                    }                  },
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }
+
   PopupMenuItem<String> _buildPopupItem(
-      String text,
-      IconData icon,
-      String value,
-      ) {
+    String text,
+    IconData icon,
+    String value,
+  ) {
     return PopupMenuItem<String>(
       value: value,
       child: Row(
@@ -443,16 +636,21 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
       ),
     );
   }
+
   Future<void> _filterToday() async {
     final db = await DatabaseHelper.instance.database;
     final todayDay = DateTime.now().day.toString();
-    final List<Map<String, dynamic>> result = await db.rawQuery('''
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      '''
       SELECT * FROM transactions
       WHERE substr(date, 1, instr(date, '-') - 1) = ?
         AND status = ?
       ORDER BY date DESC
-    ''', [todayDay, _showRunning ? 1 : 0]);
+    ''',
+      [todayDay, _showRunning ? 1 : 0],
+    );
     setState(() {
+      a = 0;
       _currentFilter = 'today';
       _filteredTransactions = result;
     });
@@ -460,36 +658,21 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
 
   Future<void> _filterYesterday() async {
     final db = await DatabaseHelper.instance.database;
-    final yesterdayDay = DateTime.now().subtract(const Duration(days: 1)).day.toString();
-    final List<Map<String, dynamic>> result = await db.rawQuery('''
+    final yesterdayDay =
+        DateTime.now().subtract(const Duration(days: 1)).day.toString();
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      '''
       SELECT * FROM transactions
       WHERE substr(date, 1, instr(date, '-') - 1) = ?
         AND status = ?
       ORDER BY date DESC
-    ''', [yesterdayDay, _showRunning ? 1 : 0]);
+    ''',
+      [yesterdayDay, _showRunning ? 1 : 0],
+    );
     setState(() {
+      a = 1;
       _currentFilter = 'yesterday';
       _filteredTransactions = result;
-    });
-  }
-
-  void _filterThisMonth() {
-    final today = DateTime.now();
-    final int todayDay = today.day;
-    setState(() {
-      _currentFilter = 'thisMonth';
-      _filteredTransactions = _transactions.where((tx) {
-        final dateStr = tx['date'];
-        DateTime? date;
-        try {
-          date = DateFormat('dd-MM-yyyy').parse(dateStr);
-        } catch (e) {
-          return false;
-        }
-        return date.day >= 1 &&
-            date.day <= todayDay &&
-            tx['status'] == (_showRunning ? 1 : 0);
-      }).toList();
     });
   }
 
@@ -510,21 +693,25 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
     );
   }
 
-  void selectdate(DateTime picked) {
+  void selectdate(DateTime picked) async {
+    await _loadTransactions();
     setState(() {
+      a = 2;
       _currentFilter = 'selectdate';
       _selectedDate = picked;
-      _filteredTransactions = _transactions.where((tx) {
-        final dateStr = tx['date'];
-        DateTime? date;
-        try {
-          date = DateFormat('dd-MM-yyyy').parse(dateStr);
-        } catch (e) {
-          return false;
-        }
-        return date.day == picked.day &&
-            tx['status'] == (_showRunning ? 1 : 0);
-      }).toList();
+      _filteredTransactions =
+          _transactions.where((tx) {
+            final dateStr = tx['date'];
+            DateTime? date;
+            try {
+              date = DateFormat('dd-MM-yyyy').parse(dateStr);
+            } catch (e) {
+              return false;
+            }
+
+            return (date.day >= 1 && date.day <= picked.day) &&
+                tx['status'] == (_showRunning ? 1 : 0);
+          }).toList();
     });
   }
 
@@ -551,8 +738,8 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
       case 'yesterday':
         _filterYesterday();
         break;
-      case 'thisMonth':
-        _filterThisMonth();
+      case 'all':
+        _filterAll();
         break;
       case 'selectdate':
         if (_selectedDate != null) {
@@ -562,11 +749,52 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
         }
         break;
       case 'tillnow':
-        _loadTransactions();
+        _filterTillNow();
         break;
       default:
         _fetchData();
     }
+  }
+
+  Future<void> _filterAll() async {
+    final db = await DatabaseHelper.instance.database;
+    a = 4;
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      '''
+    SELECT * FROM transactions
+    WHERE status = ?
+    ORDER BY date DESC
+  ''',
+      [_showRunning ? 1 : 0],
+    );
+
+    setState(() {
+      _currentFilter = 'all';
+      _filteredTransactions = result;
+    });
+  }
+
+  Future<void> _filterTillNow() async {
+    a = 3;
+    await _loadTransactions();
+    final today = DateTime.now();
+    final int todayDay = today.day;
+    setState(() {
+      _currentFilter = 'tillnow';
+      _filteredTransactions =
+          _transactions.where((tx) {
+            final dateStr = tx['date'];
+            DateTime? date;
+            try {
+              date = DateFormat('dd-MM-yyyy').parse(dateStr);
+            } catch (e) {
+              return false;
+            }
+            return date.day >= 1 &&
+                date.day <= todayDay &&
+                tx['status'] == (_showRunning ? 1 : 0);
+          }).toList();
+    });
   }
 
   @override
@@ -603,36 +831,33 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                   _selectedDate = null;
                   _onSelectDatePressed();
                   break;
-                case 'thisMonth':
-                  _currentFilter = 'thisMonth';
-                  _filterThisMonth();
+                case 'all':
+                  _currentFilter = 'all';
+                  _filterAll();
                   break;
                 case 'tillnow':
                   _currentFilter = 'tillnow';
-                  _loadTransactions();
+                  _filterTillNow();
                   break;
               }
             },
             itemBuilder:
                 (BuildContext context) => [
-              _buildPopupItem("Today", Icons.today, 'today'),
-              _buildPopupItem(
-                "Yesterday",
-                Icons.calendar_view_day,
-                'yesterday',
-              ),
-              _buildPopupItem(
-                "Select Date",
-                Icons.date_range,
-                'select_date',
-              ),
-              _buildPopupItem(
-                "This Month",
-                Icons.calendar_month,
-                'thisMonth',
-              ),
-              _buildPopupItem("Till Now", Icons.history, 'tillnow'),
-            ],
+                  _buildPopupItem("Today", Icons.today, 'today'),
+                  _buildPopupItem(
+                    "Yesterday",
+                    Icons.calendar_view_day,
+                    'yesterday',
+                  ),
+                  _buildPopupItem(
+                    "Select Date",
+                    Icons.date_range,
+                    'select_date',
+                  ),
+                  _buildPopupItem("Till Now", Icons.history, 'tillnow'),
+
+                  _buildPopupItem("All", Icons.calendar_month, 'all'),
+                ],
           ),
         ],
       ),
@@ -647,7 +872,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               ),
             if (!_isLoading) ...[
               // Search Bar
-            Container(
+              Container(
                 margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -657,7 +882,7 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: _filterSearchResults,
-                    decoration: InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Search by Name or Account No.',
                     prefixIcon: Icon(Icons.search, color: primary_color),
                     border: InputBorder.none,
@@ -670,7 +895,10 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
               ),
               // Radio buttons for filtering
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 5.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 5.0,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -707,40 +935,41 @@ class _EditRecordsPageState extends State<EditRecordsPage> {
                 ),
               ),
               // Transaction List
-            Expanded(
-                child: _filteredTransactions.isEmpty
-                  ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                              Icons.receipt_long_outlined,
-                              size: 70,
-                              color: primary_color.withOpacity(0.4),
-                            ),
-                            const SizedBox(height: 15),
-                            Text(
-                              "No Transactions Found",
-                      style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
+              Expanded(
+                child:
+                    _filteredTransactions.isEmpty
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long_outlined,
+                                size: 70,
+                                color: primary_color.withOpacity(0.4),
                               ),
-                            ),
-                            const SizedBox(height: 5),
-                  ],
-                ),
-              )
-                  : ListView.builder(
-                        itemCount: _filteredTransactions.length,
-                        padding: const EdgeInsets.only(bottom: 20),
-                itemBuilder: (context, index) {
-                          return buildTransactionCard(
-                            _filteredTransactions[index],
-                  );
-                },
+                              const SizedBox(height: 15),
+                              Text(
+                                "No Transactions Found",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                            ],
+                          ),
+                        )
+                        : ListView.builder(
+                          itemCount: _filteredTransactions.length,
+                          padding: const EdgeInsets.only(bottom: 20),
+                          itemBuilder: (context, index) {
+                            return buildTransactionCard(
+                              _filteredTransactions[index],
+                            );
+                          },
+                        ),
               ),
-            ),
             ],
           ],
         ),

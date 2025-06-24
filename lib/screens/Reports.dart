@@ -1,4 +1,7 @@
-import 'dart:ui' show TextStyle;
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -7,6 +10,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:eFinance/utils/Constants.dart';
 import 'package:eFinance/db/database_helper.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -19,10 +23,12 @@ class _ReportsPageState extends State<ReportsPage> {
   List<Map<String, dynamic>> _transactions = [];
   List<Map<String, dynamic>> _filteredTransactions = [];
   TextEditingController _searchController = TextEditingController();
+
   bool _isLoading = true;
-  bool _showRunning = true; // true for running, false for closed
-  String _currentFilter = 'all'; // values: 'all', 'today', 'yesterday', 'thisMonth', 'selectdate'
-  DateTime? _selectedDate; // Store the last picked date
+  bool _showRunning = true;
+  String _currentFilter = 'today';
+  DateTime? _selectedDate;
+  int a = 0;
 
   @override
   void initState() {
@@ -32,23 +38,36 @@ class _ReportsPageState extends State<ReportsPage> {
 
   void _fetchData() async {
     setState(() => _isLoading = true);
-    await _loadTransactions();
+    await _filterToday();
     setState(() => _isLoading = false);
   }
 
-  Future<void> _loadTransactions() async {
+  Future<void> _loadAllTransactions() async {
     final db = await DatabaseHelper.instance.database;
-    final List<Map<String, dynamic>> result = await db.query(
-      'transactions',
-      where: 'status = ?',
-      whereArgs: [_showRunning ? 1 : 0],
-      orderBy: 'date DESC',
-    );
+    final List<Map<String, dynamic>> result = await db.rawQuery('SELECT * FROM transactions');
+    setState(() {
+      _transactions = result;
+    });
+  }
 
+  Future<void> _filterTillNow() async {
+    await _loadAllTransactions();
+    final today = DateTime.now();
+    final int todayDay = today.day;
     setState(() {
       _currentFilter = 'tillnow';
-      _transactions = result;
-      _filteredTransactions = result;
+      _filteredTransactions = _transactions.where((tx) {
+        final dateStr = tx['date'];
+        DateTime? date;
+        try {
+          date = DateFormat('dd-MM-yyyy').parse(dateStr);
+        } catch (e) {
+          return false;
+        }
+        return date.day >= 1 &&
+            date.day <= todayDay &&
+            tx['status'] == (_showRunning ? 1 : 0);
+      }).toList();
     });
   }
 
@@ -251,6 +270,21 @@ class _ReportsPageState extends State<ReportsPage> {
     });
   }
 
+  Future<void> _filterAll() async {
+    final db = await DatabaseHelper.instance.database;
+
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+    SELECT * FROM transactions
+    WHERE status = ?
+    ORDER BY date DESC
+  ''', [_showRunning ? 1 : 0]);
+
+    setState(() {
+      _currentFilter = 'all';
+      _filteredTransactions = result;
+    });
+  }
+
   Future<void> _filterYesterday() async {
     final db = await DatabaseHelper.instance.database;
     final yesterdayDay = DateTime.now().subtract(const Duration(days: 1)).day.toString();
@@ -265,28 +299,6 @@ class _ReportsPageState extends State<ReportsPage> {
     setState(() {
       _currentFilter = 'yesterday';
       _filteredTransactions = result;
-    });
-  }
-
-  void _filterThisMonth() {
-    final today = DateTime.now();
-    final int todayDay = today.day;
-
-    setState(() {
-      _currentFilter = 'thisMonth';
-      _filteredTransactions = _transactions.where((tx) {
-        final dateStr = tx['date'];
-        DateTime? date;
-        try {
-          date = DateFormat('dd-MM-yyyy').parse(dateStr);
-        } catch (e) {
-          return false;
-        }
-
-        return date.day >= 1 &&
-            date.day <= todayDay &&
-            tx['status'] == (_showRunning ? 1 : 0);
-      }).toList();
     });
   }
 
@@ -307,8 +319,8 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-
-  void selectdate(DateTime picked) {
+  void selectdate(DateTime picked) async {
+    await _loadAllTransactions();
     setState(() {
       _currentFilter = 'selectdate';
       _selectedDate = picked;
@@ -320,11 +332,13 @@ class _ReportsPageState extends State<ReportsPage> {
         } catch (e) {
           return false;
         }
-        return date.day == picked.day &&
+
+        return (date.day >= 1 && date.day <= picked.day) &&
             tx['status'] == (_showRunning ? 1 : 0);
       }).toList();
     });
   }
+
 
   void _onSelectDatePressed() async {
     if (_selectedDate == null) {
@@ -340,97 +354,22 @@ class _ReportsPageState extends State<ReportsPage> {
       selectdate(_selectedDate!);
     }
   }
-
-
-  Future<void> _generatePdfReport() async {
-    final pdf = pw.Document();
-
-    final now = DateTime.now();
-    final formattedDate = "${now.day}-${now.month}-${now.year}";
-
-    pdf.addPage(
-      pw.MultiPage(
-        build: (pw.Context context) => [
-          pw.Center(
-            child: pw.Text(
-              'Loan Report',
-              style: pw.TextStyle(
-                fontSize: 20,
-                fontWeight: pw.FontWeight.bold,
-              ),
-            ),
-          ),
-          pw.SizedBox(height: 10),
-          pw.Text('Date: $formattedDate', style: pw.TextStyle(fontSize: 12)),
-          pw.SizedBox(height: 20),
-          pw.Table.fromTextArray(
-            headers: [
-              'Acc',
-              'Date',
-              'Full Name',
-              'Loan Amount',
-              'Interest',
-              'Withdrawal',
-              'Credit',
-              'Balance',
-            ],
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-            ),
-            headerDecoration:
-            pw.BoxDecoration(color: PdfColors.blueGrey800),
-            cellAlignment: pw.Alignment.centerLeft,
-            cellStyle: const pw.TextStyle(fontSize: 10),
-            cellHeight: 30,
-            cellAlignments: {
-              3: pw.Alignment.centerRight,
-              4: pw.Alignment.centerRight,
-              5: pw.Alignment.centerRight,
-              6: pw.Alignment.centerRight,
-              7: pw.Alignment.centerRight,
-            },
-            data: _filteredTransactions.map((tx) {
-              return [
-                tx['account_number'] ?? '',
-                tx['date'] ?? '',
-                tx['full_name'] ?? '',
-                tx['loan_amount'].toString(),
-                tx['interest'].toString(),
-                tx['withdrawal_amount'].toString(),
-                tx['credit_amount'].toString(),
-                tx['balance'].toString(),
-              ];
-            }).toList(),
-          ),
-          pw.SizedBox(height: 15),
-          pw.Text(
-            'Total Records: ${_filteredTransactions.length}',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-
-    // Show print dialog
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'LoanReport',
-    );
-  }
-
   void _applyCurrentFilter() {
     switch (_currentFilter) {
       case 'today':
+        a = 0;
         _filterToday();
         break;
       case 'yesterday':
+        a = 1;
         _filterYesterday();
         break;
-      case 'thisMonth':
-        _filterThisMonth();
+      case 'all':
+        a = 4;
+        _filterAll();
         break;
       case 'selectdate':
+        a = 2;
         if (_selectedDate != null) {
           selectdate(_selectedDate!);
         } else {
@@ -438,11 +377,136 @@ class _ReportsPageState extends State<ReportsPage> {
         }
         break;
       case 'tillnow':
-        _loadTransactions();
+        a = 3;
+        _filterAll();
         break;
       default:
-        _fetchData();
+        _filterToday();
     }
+  }
+  Future<void> _exportToPDF() async {
+    final pdf = pw.Document();
+
+    final logoBytes = await rootBundle.load('assets/images/logo.png');
+    final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+
+    final timestamp = DateTime.now();
+    final hour = timestamp.hour % 12 == 0 ? 12 : timestamp.hour % 12;
+    final formattedTimestamp =
+        "${timestamp.day.toString().padLeft(2, '0')}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.year} "
+        "${hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')} ${timestamp.hour >= 12 ? 'PM' : 'AM'}";
+
+    pdf.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+        footer:
+            (context) => pw.Container(
+          margin: const pw.EdgeInsets.only(top: 10),
+          child: pw.Row(
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  "Generated on $formattedTimestamp",
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    color: PdfColor.fromInt(primary_color.value),
+                  ),
+                ),
+              ),
+              pw.Expanded(
+                child: pw.Align(
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Text(
+                    "Page ${context.pageNumber} of ${context.pagesCount}",
+                    style: pw.TextStyle(
+                      fontSize: 10,
+                      color: PdfColor.fromInt(primary_color.value),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        build:
+            (context) => [
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Image(logoImage, width: 40, height: 40),
+              pw.SizedBox(width: 10),
+              pw.Text(
+                'eFinance',
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 10),
+          pw.Center(
+            child: pw.Text(
+              'Transaction Report',
+              style: pw.TextStyle(fontSize: 16),
+            ),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Table.fromTextArray(
+            headers: [
+              "Acc No",
+              "Name",
+              "Date",
+              "Amount",
+              "Interest",
+              "Withdraw",
+              "Credit",
+              "Balance",
+            ],
+            data:
+            _filteredTransactions.map((tx) {
+              return [
+                tx["account_number"] ?? '',
+                tx["full_name"] ?? '',
+                tx["date"] ?? '',
+                tx["loan_amount"]?.toString() ?? '',
+                tx["interest"]?.toString() ?? '',
+                tx["withdrawal_amount"]?.toString() ?? '',
+                tx["credit_amount"]?.toString() ?? '',
+                tx["balance"]?.toString() ?? '',
+              ];
+            }).toList(),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+            cellAlignment: pw.Alignment.centerLeft,
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: pw.BoxDecoration(
+              color: PdfColor.fromInt(primary_color.value),
+            ),
+            border: pw.TableBorder.all(width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.5),
+              1: const pw.FlexColumnWidth(2),
+              2: const pw.FlexColumnWidth(2),
+              3: const pw.FlexColumnWidth(1.5),
+              4: const pw.FlexColumnWidth(1.5),
+              5: const pw.FlexColumnWidth(1.5),
+              6: const pw.FlexColumnWidth(1.5),
+              7: const pw.FlexColumnWidth(1.5),
+            },
+          ),
+        ],
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/transaction_report.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    await Share.shareXFiles([XFile(file.path)], text: 'Transaction Report');
   }
 
   @override
@@ -476,11 +540,11 @@ class _ReportsPageState extends State<ReportsPage> {
                   _selectedDate = null;
                   _onSelectDatePressed();
                   break;
-                case 'this_month':
-                  _filterThisMonth();
+                case 'all':
+                  _filterAll();
                   break;
                 case 'till_now':
-                  _loadTransactions();
+                  _filterTillNow();
                   break;
               }
             },
@@ -497,12 +561,12 @@ class _ReportsPageState extends State<ReportsPage> {
                     Icons.date_range,
                     'select_date',
                   ),
-                  _buildPopupItem(
-                    "This Month",
-                    Icons.calendar_month,
-                    'this_month',
-                  ),
                   _buildPopupItem("Till Now", Icons.history, 'till_now'),
+                  _buildPopupItem(
+                    "All",
+                    Icons.calendar_month,
+                    'all',
+                  ),
                 ],
           ),
         ],
@@ -550,7 +614,6 @@ class _ReportsPageState extends State<ReportsPage> {
                   },
                   activeColor: primary_color,
                 ),
-
                 const Text('Running'),
                 const SizedBox(width: 20),
                 Radio<bool>(
@@ -566,7 +629,6 @@ class _ReportsPageState extends State<ReportsPage> {
                   },
                   activeColor: primary_color,
                 ),
-
                 const Text('Closed'),
               ],
             ),
@@ -636,7 +698,8 @@ class _ReportsPageState extends State<ReportsPage> {
                         const SnackBar(content: Text("No data available to print.")),
                       );
                     } else {
-                      _generatePdfReport();
+                      // _generatePdfReport();
+                      _exportToPDF();
                     }
                   }
                 },
