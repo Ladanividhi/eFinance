@@ -202,10 +202,6 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
           const SnackBar(content: Text("Failed to register user")),
         );
       }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Transaction Submitted")),
-      );
     }
   }
   void _updateBalance() {

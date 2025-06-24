@@ -145,7 +145,7 @@ class _DashboardPageState extends State<DashboardPage> {
         elevation: 0,
         title: Text(
           'Hello, $username!',
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22, letterSpacing: 1.2),
         ),
         centerTitle: true,
       ),
@@ -173,7 +173,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   const SizedBox(height: 10),
                   Text(
                     username ?? 'User',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     userEmail ?? '',
@@ -196,7 +196,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SearchScreen()),
-                );
+                ).then((_) => loadDashboardStats());;
               },
             ),
 
@@ -213,7 +213,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AddTransactionPage()),
-                );
+                ).then((_) => loadDashboardStats());
               },
             ),
             ListTile(
@@ -226,7 +226,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ReportsPage()),
-                );
+                ).then((_) => loadDashboardStats());
               },
             ),
             ListTile(
@@ -239,7 +239,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const EditRecordsPage()),
-                );
+                ).then((_) => loadDashboardStats());
               },
             ),
             ListTile(
@@ -312,48 +312,209 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
         ),
       ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // --- Stat Cards Section ---
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary_color.withOpacity(0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+              child: Column(
                 children: [
-                  _buildDoubleCardRow("Total Loan", totalLoan.toStringAsFixed(2), "Total Interest", totalInterest.toStringAsFixed(2)),
+                  // --- Total Loan Amount and Total Interest Row ---
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Card(
+                          color: Colors.white,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Total Loan Amount",
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black54),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  "₹${totalLoan.toStringAsFixed(2)}",
+                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: primary_color),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: _buildStatCard("Total Interest", totalInterest.toStringAsFixed(2))),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   _buildDoubleCardRow("C/F Balance", totalCFBalance.toStringAsFixed(2), "Withdrawal", totalWithdrawal.toStringAsFixed(2)),
                   const SizedBox(height: 10),
                   _buildDoubleCardRow("Credit", totalCredit.toStringAsFixed(2), "Balance", totalBalance.toStringAsFixed(2)),
+                  const SizedBox(height: 18),
+                  // --- Total Loans Count Card (Full Width) ---
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ReportsPage()),
+                        );
+                      },
+                      child: Card(
+                        color: primary_color.withOpacity(0.95),
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 18),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.format_list_numbered_rounded, color: Colors.white, size: 44),
+                              const SizedBox(width: 18),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Total Loans: ${runningCount + closedCount}",
+                                      style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+
                 ],
               ),
-
-              const SizedBox(height: 20),
-              const Text(
-                "Transaction Status",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primary_color),
-              ),
-              const SizedBox(height: 10),
-              PieChart(
-                dataMap: {
-                  "Running": runningCount.toDouble(),
-                  "Closed": closedCount.toDouble(),
-                },
-                animationDuration: const Duration(milliseconds: 800),
-                chartRadius: MediaQuery.of(context).size.width / 2.2,
-                colorList: [primary_color, Colors.grey],
-                chartType: ChartType.ring,
-                ringStrokeWidth: 32,
-                chartValuesOptions: const ChartValuesOptions(
-                  showChartValuesInPercentage: true,
+            ),
+            const SizedBox(height: 15),
+            // --- Pie Chart Card ---
+            Card(
+              color: Colors.white,
+              elevation: 6,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 10),
+                child: Column(
+                  children: [
+                    const Text(
+                      "Transaction Status",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: primary_color, letterSpacing: 1.1),
+                    ),
+                    const SizedBox(height: 16),
+                    PieChart(
+                      dataMap: {
+                        "Running": runningCount.toDouble(),
+                        "Closed": closedCount.toDouble(),
+                      },
+                      animationDuration: const Duration(milliseconds: 900),
+                      chartRadius: MediaQuery.of(context).size.width / 2.1,
+                      colorList: [primary_color, Colors.grey],
+                      chartType: ChartType.ring,
+                      ringStrokeWidth: 26,
+                      chartValuesOptions: const ChartValuesOptions(
+                        showChartValuesInPercentage: true,
+                        showChartValues: true,
+                        showChartValueBackground: false,
+                        decimalPlaces: 0,
+                        chartValueStyle: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                      legendOptions: const LegendOptions(
+                        legendPosition: LegendPosition.bottom,
+                        showLegends: true,
+                        legendTextStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                    ),
+                  ],
                 ),
-                legendOptions: const LegendOptions(
-                  legendPosition: LegendPosition.bottom,
-                ),
               ),
-            ],
-          ),
-        )
+            ),
+            const SizedBox(height: 15),
 
+            Row(
+              children: [
+                Expanded(
+                  child: Card(
+                    color: Colors.white,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+                      child: Column(
+                        children: [
+                          Icon(Icons.play_circle_fill, color: primary_color, size: 36),
+                          const SizedBox(height: 8),
+                          const Text('Running', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                          const SizedBox(height: 4),
+                          Text(
+                            runningCount.toString(),
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: primary_color),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Card(
+                    color: Colors.white,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+                      child: Column(
+                        children: [
+                          Icon(Icons.stop_circle, color: Colors.grey, size: 36),
+                          const SizedBox(height: 8),
+                          const Text('Closed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                          const SizedBox(height: 4),
+                          Text(
+                            closedCount.toString(),
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Optionally, add a nice footer or motivational quote
+            Center(
+              child: Text(
+                "Empowering your finances with eFinance",
+                style: TextStyle(color: primary_color.withOpacity(0.7), fontWeight: FontWeight.w600, fontSize: 15, letterSpacing: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
