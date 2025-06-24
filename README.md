@@ -1,7 +1,6 @@
-# 📊 eFinance — Personal Loan Management App
+# 📊 eFinance 
 
-A modern, offline-first finance management Flutter app to handle personal loans, transactions, interest, and balance records efficiently.  
-Built for individuals and small businesses to track running and closed loan accounts with intuitive UI and useful analytics.
+A modern, offline Personal Loan Management Flutter app to handle personal loans, transactions, interest, and balance records efficiently. Built for individuals and small businesses to track running and closed loan accounts with intuitive UI and useful analytics.
 
 ---
 
